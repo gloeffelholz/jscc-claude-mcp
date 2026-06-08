@@ -1,0 +1,24 @@
+{
+  "name": "job-search-command-center-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vercel-hosted MCP server for the Job Search Command Center (Claude edition). Forwards tool calls to a Google Apps Script web app that reads/writes the pipeline Google Sheet.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "mcp-handler": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "next": "^14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3"
+  }
+}
