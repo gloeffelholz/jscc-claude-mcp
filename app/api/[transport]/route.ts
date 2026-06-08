@@ -1,25 +1,9 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 
-/**
- * Job Search Command Center - MCP server (Claude edition)
- *
- * This server is the "Vercel" layer. Claude connects to it as a custom
- * connector and calls these tools. Each tool forwards to your Google Apps
- * Script web app, which reads and writes the pipeline Google Sheet.
- *
- *   Claude  ->  this MCP server (Vercel)  ->  Apps Script  ->  Google Sheet
- *
- * Required environment variables (set in Vercel -> Project -> Settings -> Env):
- *   APPS_SCRIPT_URL  - your Apps Script web app URL (ends in /exec)
- *   APPS_SCRIPT_KEY  - the API_KEY you set as a Script Property on the Apps Script
- */
-
 const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL || "";
 const APPS_SCRIPT_KEY = process.env.APPS_SCRIPT_KEY || "";
 
-// One opportunity record. All fields optional except where the agent enforces
-// them; the Apps Script validates required fields on create.
 const recordShape = {
   id: z.string().describe("Stable string id for the opportunity. Required."),
   company: z.string().optional(),
@@ -60,48 +44,46 @@ async function callAppsScript(payload: Record<string, unknown>) {
     redirect: "follow",
   });
   const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { error: "Non-JSON response from Apps Script", raw: text.slice(0, 500) };
-  }
+  try { return JSON.parse(text); }
+  catch { return { error: "Non-JSON response from Apps Script", raw: text.slice(0, 500) }; }
 }
 
 function asText(obj: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(obj, null, 2) }] };
 }
 
-const handler = createMcpHandler((server) => {
-  server.tool(
-    "get_opportunities",
-    "Read the job-search pipeline. Returns all opportunity records (jd_text omitted unless includeJd is true).",
-    {
-      includeJd: z.boolean().optional().describe("Include the large jd_text field. Default false."),
-      limit: z.number().int().positive().optional().describe("Max records to return."),
-    },
-    async ({ includeJd, limit }) => asText(await callAppsScript({ action: "get", includeJd: !!includeJd, limit: limit || 0 }))
-  );
-
-  server.tool(
-    "upsert_opportunity",
-    "Create or update one opportunity. Updates in place if the id already exists, otherwise appends a new row. Required on create: id, company, company_slug, role, status, date_added.",
-    { record: z.object(recordShape) },
-    async ({ record }) => asText(await callAppsScript({ action: "upsert", record }))
-  );
-
-  server.tool(
-    "upsert_opportunities_bulk",
-    "Create or update many opportunities at once. Each is deduped by id. Returns updated ids and skipped items with reasons.",
-    { records: z.array(z.object(recordShape)) },
-    async ({ records }) => asText(await callAppsScript({ action: "upsertBulk", records }))
-  );
-
-  server.tool(
-    "update_opportunity",
-    "Update an existing opportunity by id. Never creates a new row; errors if the id is not found. Only the fields you pass are changed.",
-    { record: z.object(recordShape) },
-    async ({ record }) => asText(await callAppsScript({ action: "update", record }))
-  );
-});
+const handler = createMcpHandler(
+  (server) => {
+    server.tool(
+      "get_opportunities",
+      "Read the job-search pipeline. Returns all opportunity records (jd_text omitted unless includeJd is true).",
+      {
+        includeJd: z.boolean().optional().describe("Include the large jd_text field. Default false."),
+        limit: z.number().int().positive().optional().describe("Max records to return."),
+      },
+      async ({ includeJd, limit }) => asText(await callAppsScript({ action: "get", includeJd: !!includeJd, limit: limit || 0 }))
+    );
+    server.tool(
+      "upsert_opportunity",
+      "Create or update one opportunity. Updates in place if the id already exists, otherwise appends a new row. Required on create: id, company, company_slug, role, status, date_added.",
+      { record: z.object(recordShape) },
+      async ({ record }) => asText(await callAppsScript({ action: "upsert", record }))
+    );
+    server.tool(
+      "upsert_opportunities_bulk",
+      "Create or update many opportunities at once. Each is deduped by id. Returns updated ids and skipped items with reasons.",
+      { records: z.array(z.object(recordShape)) },
+      async ({ records }) => asText(await callAppsScript({ action: "upsertBulk", records }))
+    );
+    server.tool(
+      "update_opportunity",
+      "Update an existing opportunity by id. Never creates a new row; errors if the id is not found. Only the fields you pass are changed.",
+      { record: z.object(recordShape) },
+      async ({ record }) => asText(await callAppsScript({ action: "update", record }))
+    );
+  },
+  {},
+  { basePath: "/api" }
+);
 
 export { handler as GET, handler as POST };
